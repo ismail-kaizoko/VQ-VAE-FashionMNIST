@@ -120,7 +120,7 @@ class VQVAE(nn.Module):
                  embedding_dim: int,
                  num_embeddings: int,
                 #hidden_dims: List = None,
-                 downsampling_factor :int = 2,
+                 downsampling_factor :int = 4,
                  beta: float = 0.25,
                  embedding: Tensor = None,
                  **kwargs) -> None:
@@ -198,28 +198,6 @@ class VQVAE(nn.Module):
         modules.append(nn.LeakyReLU())
 
         hidden_dims.reverse()
-
-        # for i in range(len(hidden_dims) - 1):
-        #     modules.append(
-        #         nn.Sequential(
-        #             nn.ConvTranspose2d(hidden_dims[i],
-        #                                hidden_dims[i + 1],
-        #                                kernel_size=4,
-        #                                stride=2,
-        #                                padding=1),
-        #             nn.LeakyReLU())
-        #     )
-
-        # modules.append(
-        #     nn.Sequential(
-        #         nn.ConvTranspose2d(hidden_dims[-1],
-        #                            out_channels=1,
-        #                            kernel_size=4,
-        #                            stride=2, padding=1),
-        #         nn.ReLU()
-        #         ))
-
-        # self.decoder = nn.Sequential(*modules)
 
         for i in range(len(hidden_dims) - 1):
             modules.append(
@@ -302,20 +280,13 @@ class VQVAE(nn.Module):
                 'CodeBook Loss':embedding_loss,
                 'Embedding Loss':commitment_loss_beta}
 
-    # def sample(self,
-    #            num_samples: int,
-    #            current_device: Union[int, str], **kwargs) -> Tensor:
-    #     raise Warning('VQVAE sampler is not implemented.')
 
-    def generate(self, x: Tensor, **kwargs) -> Tensor:
+    def reconstruct(self, x: Tensor, **kwargs) -> Tensor:
         """
         Given an input image x, returns the reconstructed image
         :param x: (Tensor) [B x C x H x W]
         :return: (Tensor) [B x C x H x W]
         """
-
-        return (self.forward(x)[0] > 0.5 ) # Since we are dealing with binary image.
-
-
-
+        outputs, _, _, _ = self(x)
+        return outputs
 
