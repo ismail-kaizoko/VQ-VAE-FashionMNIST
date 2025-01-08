@@ -120,7 +120,7 @@ class VQVAE(nn.Module):
                  embedding_dim: int,
                  num_embeddings: int,
                 #hidden_dims: List = None,
-                 downsampling_factor :int = 4,
+                 downsampling_factor :int = 2,
                  beta: float = 0.25,
                  embedding: Tensor = None,
                  **kwargs) -> None:
@@ -136,10 +136,12 @@ class VQVAE(nn.Module):
             raise Warning("VQVAE can't have a donwsampling factor less than 2")
         elif downsampling_factor ==2 :
             hidden_dims = [32]
-        elif downsampling_factor == 3 :
+        elif downsampling_factor == 4 :
             hidden_dims = [32, 64]
-        elif downsampling_factor > 3 :
-            raise Warning("donwsizing sampling factor more than 2 is too much. ")
+        elif downsampling_factor == 8 :
+            hidden_dims = [32, 64, 128]
+        else:
+            assert("downsamplig factor must be one of the following numbers : {2, 4, 8 }")
 
 
 
@@ -197,26 +199,52 @@ class VQVAE(nn.Module):
 
         hidden_dims.reverse()
 
+        # for i in range(len(hidden_dims) - 1):
+        #     modules.append(
+        #         nn.Sequential(
+        #             nn.ConvTranspose2d(hidden_dims[i],
+        #                                hidden_dims[i + 1],
+        #                                kernel_size=4,
+        #                                stride=2,
+        #                                padding=1),
+        #             nn.LeakyReLU())
+        #     )
+
+        # modules.append(
+        #     nn.Sequential(
+        #         nn.ConvTranspose2d(hidden_dims[-1],
+        #                            out_channels=1,
+        #                            kernel_size=4,
+        #                            stride=2, padding=1),
+        #         nn.ReLU()
+        #         ))
+
+        # self.decoder = nn.Sequential(*modules)
+
         for i in range(len(hidden_dims) - 1):
             modules.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(hidden_dims[i],
-                                       hidden_dims[i + 1],
-                                       kernel_size=4,
-                                       stride=2,
-                                       padding=1),
+                    # Upsample using bilinear interpolation
+                    nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+                    # Apply convolution to adjust channels
+                    nn.Conv2d(hidden_dims[i],
+                              hidden_dims[i + 1],
+                              kernel_size=3,
+                              padding=1),
                     nn.LeakyReLU())
             )
-
+        
+        # Final layer
         modules.append(
             nn.Sequential(
-                nn.ConvTranspose2d(hidden_dims[-1],
-                                   out_channels=1,
-                                   kernel_size=4,
-                                   stride=2, padding=1),
-                nn.ReLU()
-                ))
-
+                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+                nn.Conv2d(hidden_dims[-1],
+                          out_channels=1,
+                          kernel_size=3,
+                          padding=1),
+                nn.ReLU())
+        )
+        
         self.decoder = nn.Sequential(*modules)
 
     def encode(self, input: Tensor) -> List[Tensor]:
