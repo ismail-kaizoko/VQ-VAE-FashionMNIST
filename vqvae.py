@@ -93,6 +93,26 @@ class VectorQuantizer(nn.Module):
         
         return embedding_histogram
 
+    def get_latents_index(self, latents: Tensor) -> Tensor:
+        B = latents.shape[0]
+        latents = latents.permute(0, 2, 3, 1).contiguous()  # [B x D x H x W] -> [B x H x W x D]
+        latents_shape = latents.shape
+        flat_latents = latents.view(-1, self.D)  # [BHW x D]
+
+        # Compute L2 distance between latents and embedding weights
+        dist = torch.sum(flat_latents ** 2, dim=1, keepdim=True) + \
+               torch.sum(self.embedding.weight ** 2, dim=1) - \
+               2 * torch.matmul(flat_latents, self.embedding.weight.t())  # [BHW x K]
+
+        # Get the encoding that has the min distance
+        encoding_inds = torch.argmin(dist, dim=1).unsqueeze(1)  # [BHW, 1]
+
+
+        # Calculate the histogram of used embeddings
+        encoding_inds_flat = encoding_inds.view(-1)  # Flatten to [BHW]
+        encoding_inds_flat = encoding_inds_flat.view(B,-1) #Flatten to [B,HW]
+        return encoding_inds_flat
+
 
 
 class ResidualLayer(nn.Module):
@@ -252,11 +272,6 @@ class VQVAE(nn.Module):
         return [self.decode(quantized_inputs), inputs, embedding_loss, commitment_loss_beta]
 
 
-    def codebook_usage(self, inputs: Tensor, **kwargs) -> List[Tensor]:
-        encoding = self.encode(inputs)[0]
-        quantized_hist = self.vq_layer.quantized_latents_hist(encoding)
-        return quantized_hist
-
 
 
     def loss_function(self,
@@ -289,4 +304,18 @@ class VQVAE(nn.Module):
         """
         outputs, _, _, _ = self(x)
         return outputs
+
+
+    def get_indices(self, x):
+        latents = self.encode(x)[0]
+        indices = self.vq_layer.get_latents_index(latents)
+        return indices
+
+
+
+
+    def codebook_usage(self, inputs: Tensor, **kwargs) -> List[Tensor]:
+        encoding = self.encode(inputs)[0]
+        quantized_hist = self.vq_layer.quantized_latents_hist(encoding)
+        return quantized_hist
 

@@ -121,7 +121,7 @@ def codebook_hist_testset(model, val_loader):
 
 
 
-    def evaluate_model(model, val_loader, device):
+def evaluate_model(model, val_loader, device):
     model.eval()
     val_loss = 0.0
     with torch.no_grad():
